@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SkyRoute Logistics Dashboard</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #f1f5f9; color: #17243b; font: 13px Arial, sans-serif; }
+    header { padding: 15px 20px; background: #102b46; color: white; }
+    header h1 { margin: 0; font-size: 20px; }
+    header p { margin: 4px 0 0; color: #cbd8e6; font-size: 11px; }
+    main { width: min(900px, calc(100% - 28px)); margin: 17px auto; }
+    .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 12px; }
+    select, input, button, .download { min-height: 32px; padding: 7px 10px; border: 1px solid #d5dee8; border-radius: 5px; background: white; color: #17314b; font: inherit; }
+    input { flex: 1; min-width: 150px; }
+    button, .download { cursor: pointer; text-decoration: none; }
+    .download { background: #0876c9; border-color: #0876c9; color: white; }
+    .hint { margin: 0 0 12px; color: #718198; font-size: 11px; }
+    .metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 12px; }
+    .card { border: 1px solid #e1e8ef; border-radius: 8px; background: white; }
+    .metric { padding: 12px 14px; }
+    .label { margin: 0 0 7px; color: #718198; font-size: 10px; font-weight: 700; text-transform: uppercase; }
+    .value { margin: 0; color: #0876c9; font-size: 22px; font-weight: 700; }
+    .green { color: #159447; }
+    .red { color: #d82b2b; }
+    .panels { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+    .panel { padding: 14px; }
+    h2 { margin: 0 0 13px; font-size: 14px; }
+    .bar-row { display: grid; grid-template-columns: 85px 1fr 25px; align-items: center; gap: 8px; margin: 13px 0; font-size: 11px; }
+    .track { height: 10px; overflow: hidden; border-radius: 8px; background: #e9eef4; }
+    .bar { height: 100%; border-radius: inherit; background: #159f50; }
+    .bar.delayed { background: #f0a000; }
+    .bar.transit { background: #4285d4; }
+    .count { text-align: right; }
+    .table-panel { padding: 14px; }
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 11px; }
+    th, td { padding: 8px; border-bottom: 1px solid #edf1f4; text-align: left; white-space: nowrap; }
+    th { background: #f7f9fb; color: #51647a; }
+    .badge { padding: 3px 7px; border-radius: 10px; background: #dcf8e6; color: #17703a; font-size: 10px; }
+    .badge.delayed { background: #fff1d2; color: #956000; }
+    .badge.transit { background: #e4efff; color: #245d9c; }
+    .empty { padding: 16px; color: #718198; text-align: center; }
+    footer { padding: 0 12px 16px; color: #718198; text-align: center; font-size: 10px; }
+    @media (max-width: 600px) {
+      .metrics { grid-template-columns: repeat(2, 1fr); }
+      .panels { grid-template-columns: 1fr; }
+      .toolbar select { flex: 1; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>SkyRoute Logistics</h1>
+    <p>Shipment Data Dashboard</p>
+  </header>
+  <main>
+    <section class="toolbar" aria-label="Dashboard controls">
+      <a class="download" id="download" href="#">Download CSV</a>
+      <select id="filter" aria-label="Filter by delivery status">
+        <option value="All">All records</option>
+        <option value="Delivered">Delivered</option>
+        <option value="Delayed">Delayed</option>
+        <option value="In Transit">In Transit</option>
+      </select>
+      <input id="search" type="search" placeholder="Search order or region" aria-label="Search order or region">
+    </section>
+    <p class="hint">Sample shipment data is included in this page. No API connection is required.</p>
+
+    <section class="metrics" aria-label="Shipment totals">
+      <article class="card metric"><p class="label">Input rows</p><p class="value" id="total">20</p></article>
+      <article class="card metric"><p class="label">Delivered</p><p class="value green" id="delivered">14</p></article>
+      <article class="card metric"><p class="label">Delayed</p><p class="value" id="delayed">3</p></article>
+      <article class="card metric"><p class="label">In transit</p><p class="value red" id="transit">3</p></article>
+    </section>
+
+    <section class="panels">
+      <article class="card panel">
+        <h2>Delivery Status</h2>
+        <div id="chart"></div>
+      </article>
+      <article class="card panel">
+        <h2>Pipeline Summary</h2>
+        <p class="hint">Status: Ready</p>
+        <p class="hint">Processed rows: 20</p>
+        <p class="hint">Rejected rows: 0</p>
+        <p class="hint">Total shipping cost: 364.20</p>
+        <p class="hint">Average shipment weight: 5.08 kg</p>
+      </article>
+    </section>
+
+    <section class="card table-panel">
+      <h2>Shipment Records</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Order ID</th><th>Status</th><th>Delivery Date</th><th>Region</th></tr></thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+      <p class="hint" id="shown"></p>
+    </section>
+  </main>
+  <footer>SkyRoute Logistics Ltd · Sample data dashboard</footer>
+
+  <script>
+    const records = [
+      ["ORD-1001","Delivered","2026-10-05","North"],
+      ["ORD-1002","Delivered","2026-10-09","South"],
+      ["ORD-1003","In Transit","","East"],
+      ["ORD-1004","Delivered","2026-10-08","West"],
+      ["ORD-1005","Delivered","2026-10-06","North"],
+      ["ORD-1006","Delayed","","South"],
+      ["ORD-1007","Delivered","2026-10-10","East"],
+      ["ORD-1008","Delivered","2026-10-07","West"],
+      ["ORD-1009","In Transit","","North"],
+      ["ORD-1010","Delivered","2026-10-13","South"],
+      ["ORD-1011","Delivered","2026-10-09","East"],
+      ["ORD-1012","Delayed","","West"],
+      ["ORD-1013","Delivered","2026-10-11","North"],
+      ["ORD-1014","Delivered","2026-10-15","South"],
+      ["ORD-1015","In Transit","","East"],
+      ["ORD-1016","Delivered","2026-10-12","West"],
+      ["ORD-1017","Delivered","2026-10-17","North"],
+      ["ORD-1018","Delayed","","South"],
+      ["ORD-1019","Delivered","2026-10-14","East"],
+      ["ORD-1020","Delivered","2026-10-18","West"]
+    ];
+    const totals = { "Delivered": 14, "Delayed": 3, "In Transit": 3 };
+    const $ = (id) => document.getElementById(id);
+
+    function renderChart() {
+      const chart = $("chart");
+      chart.replaceChildren();
+      for (const [status, count] of Object.entries(totals)) {
+        const row = document.createElement("div");
+        row.className = "bar-row";
+        const label = document.createElement("span");
+        label.textContent = status;
+        const track = document.createElement("span");
+        track.className = "track";
+        const bar = document.createElement("span");
+        bar.className = `bar ${status === "Delayed" ? "delayed" : status === "In Transit" ? "transit" : ""}`;
+        bar.style.display = "block";
+        bar.style.width = `${count / 14 * 100}%`;
+        track.append(bar);
+        const value = document.createElement("span");
+        value.className = "count";
+        value.textContent = count;
+        row.append(label, track, value);
+        chart.append(row);
+      }
+    }
+
+    function renderTable() {
+      const filter = $("filter").value;
+      const query = $("search").value.trim().toLowerCase();
+      const visible = records.filter(([order, status, date, region]) =>
+        (filter === "All" || status === filter) &&
+        (!query || `${order} ${region} ${date}`.toLowerCase().includes(query))
+      );
+      const body = $("rows");
+      body.replaceChildren();
+      for (const [order, status, date, region] of visible) {
+        const row = document.createElement("tr");
+        for (const value of [order]) {
+          const cell = document.createElement("td");
+          cell.textContent = value;
+          row.append(cell);
+        }
+        const statusCell = document.createElement("td");
+        const badge = document.createElement("span");
+        badge.className = `badge ${status === "Delayed" ? "delayed" : status === "In Transit" ? "transit" : ""}`;
+        badge.textContent = status;
+        statusCell.append(badge);
+        row.append(statusCell);
+        for (const value of [date || "—", region]) {
+          const cell = document.createElement("td");
+          cell.textContent = value;
+          row.append(cell);
+        }
+        body.append(row);
+      }
+      if (!visible.length) {
+        const row = document.createElement("tr");
+        row.innerHTML = '<td class="empty" colspan="4">No matching records</td>';
+        body.append(row);
+      }
+      $("shown").textContent = `Showing ${visible.length} of ${records.length} records`;
+    }
+
+    $("download").addEventListener("click", (event) => {
+      event.preventDefault();
+      const csv = [
+        "order_id,status,delivery_date,region",
+        ...records.map((record) => record.map((value) => `"${value.replaceAll('"', '""')}"`).join(","))
+      ].join("\r\n");
+      const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "skyroute_sample_shipments.csv";
+      link.click();
+      URL.revokeObjectURL(url);
+    });
+
+    $("filter").addEventListener("change", renderTable);
+    $("search").addEventListener("input", renderTable);
+    renderChart();
+    renderTable();
+  </script>
+</body>
+</html>

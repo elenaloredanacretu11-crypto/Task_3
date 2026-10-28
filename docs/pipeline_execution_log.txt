@@ -1,0 +1,2 @@
+2026-10-28 21:55:42,800 INFO skyroute.pipeline Pipeline started: input=logistics_sample.csv
+2026-10-28 21:55:42,814 INFO skyroute.pipeline Pipeline completed: input_rows=20 processed_rows=20 rejected_rows=0 duration_seconds=0.014

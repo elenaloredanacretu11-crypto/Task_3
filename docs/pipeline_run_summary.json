@@ -1,0 +1,15 @@
+{
+  "input_file": "D:\\Elena_Loredana_Cretu_Task3\\data\\logistics_sample.csv",
+  "output_file": "D:\\Elena_Loredana_Cretu_Task3\\output\\processed_shipments.csv",
+  "input_rows": 20,
+  "processed_rows": 20,
+  "rejected_rows": 0,
+  "status_counts": {
+    "Delayed": 3,
+    "Delivered": 14,
+    "In Transit": 3
+  },
+  "total_shipping_cost": 364.2,
+  "average_weight_kg": 5.08,
+  "rejections": []
+}
